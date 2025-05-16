@@ -1,0 +1,109 @@
+--[[
+	WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
+]]
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local ESPEnabled = false
+local ESPObjects = {}
+local TextColor = Color3.fromRGB(204, 255, 204)
+
+local function GetPrimaryPart(model)
+    if model.PrimaryPart then return model.PrimaryPart end
+    for _, part in ipairs(model:GetChildren()) do
+        if part:IsA("BasePart") then
+            model.PrimaryPart = part
+            return part
+        end
+    end
+    return nil
+end
+
+local function CreateItemESP(item)
+    local primaryPart = GetPrimaryPart(item)
+    if not primaryPart then return end
+
+    local billboardGui = Instance.new("BillboardGui")
+    billboardGui.Adornee = primaryPart
+    billboardGui.Size = UDim2.new(0, 200, 0, 50)
+    billboardGui.StudsOffset = Vector3.new(0, 3, 0)
+    billboardGui.AlwaysOnTop = true
+
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = item.Name
+    textLabel.TextSize = 14
+    textLabel.TextColor3 = TextColor
+    textLabel.Parent = billboardGui
+
+    billboardGui.Parent = game.CoreGui
+    ESPObjects[item] = billboardGui
+end
+
+local function ToggleESP(value)
+    ESPEnabled = value
+    if ESPEnabled then
+        local runtimeItems = workspace:FindFirstChild("RuntimeItems")
+        if runtimeItems then
+            for _, item in ipairs(runtimeItems:GetChildren()) do
+                if item:IsA("Model") and not ESPObjects[item] then
+                    CreateItemESP(item)
+                end
+            end
+        end
+    else
+        for _, gui in pairs(ESPObjects) do
+            if gui then gui:Destroy() end
+        end
+        ESPObjects = {}
+    end
+end
+
+local function UpdateTextColor(value)
+    TextColor = value
+    for _, gui in pairs(ESPObjects) do
+        local textLabel = gui:FindFirstChildOfClass("TextLabel")
+        if textLabel then
+            textLabel.TextColor3 = TextColor
+        end
+    end
+end
+
+local function UpdateTextSize()
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+    local rootPart = LocalPlayer.Character.HumanoidRootPart
+    for item, gui in pairs(ESPObjects) do
+        local primaryPart = GetPrimaryPart(item)
+        if gui and primaryPart then
+            local distance = (rootPart.Position - primaryPart.Position).Magnitude
+            local size = math.clamp(16 / (distance / 10), 8, 24)
+            local textLabel = gui:FindFirstChildOfClass("TextLabel")
+            if textLabel then
+                textLabel.TextSize = size
+            end
+        end
+    end
+end
+
+local function MonitorRuntimeItems()
+    local runtimeItems = workspace:FindFirstChild("RuntimeItems")
+    if runtimeItems then
+        runtimeItems.ChildAdded:Connect(function(item)
+            if ESPEnabled and item:IsA("Model") and not ESPObjects[item] then
+                CreateItemESP(item)
+            end
+        end)
+    end
+end
+
+workspace.ChildAdded:Connect(function(child)
+    if child:IsA("Folder") and child.Name == "RuntimeItems" then
+        MonitorRuntimeItems()
+    end
+end)
+
+MonitorRuntimeItems()
+RunService.Heartbeat:Connect(UpdateTextSize)
+
+ToggleESP(true)
